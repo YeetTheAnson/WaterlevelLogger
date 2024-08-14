@@ -1,13 +1,31 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <FS.h>
+#include <LittleFS.h>
 
-const char* ssid = "SSID";
-const char* password = "Password";
+const char* ssid = "valence@unifi";
+const char* password = "ValenceTechnology751016";
 
-const int trigPin = 12;  // D6
-const int echoPin = 14;  // D5
+const int trigPin = 12;
+const int echoPin = 14;
 
 ESP8266WebServer server(80);
+
+float todayData[24] = {0};
+float weekData[14] = {0};
+float monthData[30] = {0};
+
+const char* todayDataFile = "/todayData.json";
+const char* weekDataFile = "/weekData.json";
+const char* monthDataFile = "/monthData.json";
+
+void handleRoot();
+void handleData();
+void handleDistance();
+void updateData();
+float measureDistance();
+void loadData();
+void saveData();
 
 void setup() {
   Serial.begin(115200);
@@ -26,13 +44,34 @@ void setup() {
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 
+  if (!LittleFS.begin()) {
+    Serial.println("An error has occurred while mounting LittleFS");
+    return;
+  }
+  Serial.println("LittleFS mounted successfully");
+
+  loadData();
+
   server.on("/", HTTP_GET, handleRoot);
+  server.on("/data", HTTP_GET, handleData);
+  server.on("/distance", HTTP_GET, handleDistance);
+
+  server.on("/glyph_rep.svg", HTTP_GET, []() {
+    File file = LittleFS.open("/glyph_rep.svg", "r");
+    if (!file) {
+      server.send(404, "text/plain", "File not found");
+      return;
+    }
+    server.streamFile(file, "image/svg+xml");
+    file.close();
+  });
 
   server.begin();
 }
 
 void loop() {
   server.handleClient();
+  updateData();
 }
 
 void handleRoot() {
@@ -54,7 +93,7 @@ void handleRoot() {
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-image: url('glyph_rep.svg');
+            background-image: url('/glyph_rep.svg');
             background-repeat: repeat;
             background-position: top left;
             background-size: 50px 50px;
@@ -181,34 +220,39 @@ void handleRoot() {
             });
         }
 
-        function plotToday() {
-            fetch('/data')
+        function fetchData() {
+            return fetch('/data')
                 .then(response => response.json())
-                .then(data => {
-                    const todayData = data.today;
-                    const xLabels = Array.from({length: todayData.length}, (_, i) => `${i}:00`);
-                    plotData(todayData, 'Water Level Today', xLabels);
+                .catch(error => {
+                    console.error('Error fetching data:', error);
                 });
+        }
+
+        function plotToday() {
+            fetchData().then(data => {
+                if (!data) return;
+                const todayData = data.today;
+                const xLabels = Array.from({length: todayData.length}, (_, i) => `${i}:00`);
+                plotData(todayData, 'Water Level Today', xLabels);
+            });
         }
 
         function plotLast7Days() {
-            fetch('/data')
-                .then(response => response.json())
-                .then(data => {
-                    const last7DaysData = data.week;
-                    const xLabels = Array.from({length: last7DaysData.length}, (_, i) => `Day ${Math.floor(i / 2) + 1} - ${i % 2 === 0 ? 'AM' : 'PM'}`);
-                    plotData(last7DaysData, 'Water Level Over Last 7 Days', xLabels);
-                });
+            fetchData().then(data => {
+                if (!data) return;
+                const last7DaysData = data.week;
+                const xLabels = Array.from({length: last7DaysData.length}, (_, i) => `Day ${Math.floor(i / 2) + 1} - ${i % 2 === 0 ? 'AM' : 'PM'}`);
+                plotData(last7DaysData, 'Water Level Over Last 7 Days', xLabels);
+            });
         }
 
         function plotMax() {
-            fetch('/data')
-                .then(response => response.json())
-                .then(data => {
-                    const maxData = data.month;
-                    const xLabels = Array.from({length: maxData.length}, (_, i) => `Day ${i + 1}`);
-                    plotData(maxData, 'Water Level Over Last 30 Days', xLabels);
-                });
+            fetchData().then(data => {
+                if (!data) return;
+                const maxData = data.month;
+                const xLabels = Array.from({length: maxData.length}, (_, i) => `Day ${i + 1}`);
+                plotData(maxData, 'Water Level Over Last 30 Days', xLabels);
+            });
         }
 
         plotToday();
@@ -227,12 +271,16 @@ void handleRoot() {
             document.body.style.backgroundPosition = 'top left';
         });
 
-        // Fetch distance every 2 seconds for debugging
         setInterval(() => {
             fetch('/distance')
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Measured Distance:', data.distance);
+                    if (data && data.distance !== undefined) {
+                        console.log('Measured Distance:', data.distance);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching distance:', error);
                 });
         }, 2000);
     </script>
@@ -242,30 +290,82 @@ void handleRoot() {
   server.send(200, "text/html", html);
 }
 
+void handleData() {
+  String json = "{";
+  json += "\"today\":"; json += "[";
+  for (int i = 0; i < 24; i++) json += (i == 0 ? "" : ",") + String(todayData[i]);
+  json += "],";
+  json += "\"week\":"; json += "[";
+  for (int i = 0; i < 14; i++) json += (i == 0 ? "" : ",") + String(weekData[i]);
+  json += "],";
+  json += "\"month\":"; json += "[";
+  for (int i = 0; i < 30; i++) json += (i == 0 ? "" : ",") + String(monthData[i]);
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
+void handleDistance() {
+  float distance = measureDistance();
+  String json = "{";
+  json += "\"distance\":"; json += String(distance);
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+
 float measureDistance() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
-  
+
   long duration = pulseIn(echoPin, HIGH);
-  float distance = (duration * 0.0344) / 2; 
+  float distance = (duration * 0.0344) / 2;
   return distance;
 }
 
-void updateData() {
-  static float todayData[24] = {0};
-  static float weekData[14] = {0};
-  static float monthData[30] = {0};
+void loadData() {
+  File file;
   
-  unsigned long currentMillis = millis();
-  static unsigned long lastUpdate = 0;
-  
-
-  server.on("/distance", HTTP_GET, [distance]() {
-    String json = "{ \"distance\": " + String(distance) + " }";
-    server.send(200, "application/json", json);
-  });
+  file = LittleFS.open(todayDataFile, "r");
+  if (file) {
+    String content = file.readString();
+    DynamicJsonDocument json(1024);
+    deserializeJson(json, content);
+    for (int i = 0; i < 24; i++) todayData[i] = json["today"][i].as<float>();
+    file.close();
   }
+  
+  file = LittleFS.open(weekDataFile, "r");
+  if (file) {
+    String content = file.readString();
+    DynamicJsonDocument json(1024);
+    deserializeJson(json, content);
+    for (int i = 0; i < 14; i++) weekData[i] = json["week"][i].as<float>();
+    file.close();
+  }
+  
+  file = LittleFS.open(monthDataFile, "r");
+  if (file) {
+    String content = file.readString();
+    DynamicJsonDocument json(1024);
+    deserializeJson(json, content);
+    for (int i = 0; i < 30; i++) monthData[i] = json["month"][i].as<float>();
+    file.close();
+  }
+}
+
+void saveData() {
+  File file;
+  
+  file = LittleFS.open(todayDataFile, "w");
+  if (file) {
+    DynamicJsonDocument json(1024);
+    json["today"] = JsonArray();
+    for (int i = 0; i < 24; i++) json["today"].add(todayData[i]);
+    serializeJson(json, file);
+    file.close();
+  }
+ 
 }

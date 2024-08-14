@@ -2,7 +2,7 @@ const ctx = document.getElementById('waterLevelChart').getContext('2d');
 let waterLevelChart;
 const spotlight = document.getElementById('spotlight');
 
-function plotData(data, label) {
+function plotData(data, label, xLabels) {
     if (waterLevelChart) {
         waterLevelChart.destroy();
     }
@@ -10,7 +10,7 @@ function plotData(data, label) {
     waterLevelChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.map((_, index) => `Day ${index + 1}`),
+            labels: xLabels,
             datasets: [{
                 label: label,
                 data: data,
@@ -30,8 +30,10 @@ function plotData(data, label) {
                 y: {
                     title: {
                         display: true,
-                        text: 'Water Level (m)'
-                    }
+                        text: 'Water Level (cm)'
+                    },
+                    min: 0,
+                    max: 350
                 }
             }
         }
@@ -39,25 +41,35 @@ function plotData(data, label) {
 }
 
 function plotToday() {
-    const todayData = [1, 2, 1.5, 1.7, 2.1, 1.8, 1.6]; // Example data
-    plotData(todayData, 'Water Level Today');
+    const todayData = Array.from({length: 24}, () => Math.floor(Math.random() * 350)); // example data
+    const xLabels = Array.from({length: 24}, (_, i) => `${i}:00`);
+    plotData(todayData, 'Water Level Today', xLabels);
 }
 
 function plotLast7Days() {
-    const last7DaysData = [1.5, 1.7, 1.6, 1.8, 2.0, 1.9, 2.2]; // Example data 
-    plotData(last7DaysData, 'Water Level Over Last 7 Days');
+    const last7DaysData = Array.from({length: 14}, () => Math.floor(Math.random() * 350)); // example data
+    const xLabels = Array.from({length: 14}, (_, i) => `Day ${Math.floor(i / 2) + 1} - ${i % 2 === 0 ? 'AM' : 'PM'}`);
+    plotData(last7DaysData, 'Water Level Over Last 7 Days', xLabels);
 }
 
 function plotMax() {
-    const maxData = [1.2, 1.3, 1.4, 1.5, 1.8, 1.9, 2.0]; // Example max data
-    plotData(maxData, 'Maximum Water Level');
+    const maxData = Array.from({length: 30}, () => Math.floor(Math.random() * 350)); // example data
+    const xLabels = Array.from({length: 30}, (_, i) => `Day ${i + 1}`);
+    plotData(maxData, 'Water Level Over Last 30 Days', xLabels);
 }
 
-// Default graph is today graph
 plotToday();
 
-// Spotlight script
 document.addEventListener('mousemove', function (e) {
     spotlight.style.left = `${e.clientX}px`;
     spotlight.style.top = `${e.clientY}px`;
+
+    const bgShiftX = e.clientX * 0.05;
+    const bgShiftY = e.clientY * 0.05;
+
+    document.body.style.backgroundPosition = `${bgShiftX}px ${bgShiftY}px`;
+});
+
+document.addEventListener('mouseleave', function () {
+    document.body.style.backgroundPosition = 'top left';
 });

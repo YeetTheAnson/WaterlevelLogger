@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Level</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: rgb(250,239,214);
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: url('glyph_rep.svg');
+            background-repeat: repeat;
+            background-position: top left;
+            background-size: 50px 50px;
+            position: relative;
+            overflow: hidden; 
+        }
+
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(250,239,214,0.7); 
+            pointer-events: none; 
+        }
+
+        .spotlight {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: transparent;
+            box-shadow: 0 0 0 100vmax rgba(250,239,214, 0.85); 
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: screen;
+        }
+
+        .container {
+            text-align: center;
+            width: 80%;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: rgba(255, 255, 255, 0.7); 
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1; 
+            position: relative;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        .buttons {
+            margin-top: 20px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Water Level Monitor</h1>
+        <canvas id="waterLevelChart"></canvas>
+        <div class="buttons">
+            <button onclick="plotToday()">Today</button>
+            <button onclick="plotLast7Days()">Past Week</button>
+            <button onclick="plotMax()">Past Month</button>
+        </div>
+    </div>
+    <div class="spotlight" id="spotlight"></div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('waterLevelChart').getContext('2d');
+        let waterLevelChart;
+        const spotlight = document.getElementById('spotlight');
+
+        function plotData(data, label, xLabels) {
+            if (waterLevelChart) {
+                waterLevelChart.destroy();
+            }
+
+            waterLevelChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: xLabels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        fill: false,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Water Level (cm)'
+                            },
+                            min: 0,
+                            max: 350
+                        }
+                    }
+                }
+            });
+        }
+
+        function plotToday() {
+            const todayData = Array.from({length: 24}, () => Math.floor(Math.random() * 350)); // example data
+            const xLabels = Array.from({length: 24}, (_, i) => `${i}:00`);
+            plotData(todayData, 'Water Level Today', xLabels);
+        }
+
+        function plotLast7Days() {
+            const last7DaysData = Array.from({length: 14}, () => Math.floor(Math.random() * 350)); // example data
+            const xLabels = Array.from({length: 14}, (_, i) => `Day ${Math.floor(i / 2) + 1} - ${i % 2 === 0 ? 'AM' : 'PM'}`);
+            plotData(last7DaysData, 'Water Level Over Last 7 Days', xLabels);
+        }
+
+        function plotMax() {
+            const maxData = Array.from({length: 30}, () => Math.floor(Math.random() * 350)); // example data
+            const xLabels = Array.from({length: 30}, (_, i) => `Day ${i + 1}`);
+            plotData(maxData, 'Water Level Over Last 30 Days', xLabels);
+        }
+
+        plotToday();
+
+        document.addEventListener('mousemove', function (e) {
+            spotlight.style.left = `${e.clientX}px`;
+            spotlight.style.top = `${e.clientY}px`;
+
+            const bgShiftX = e.clientX * 0.05;
+            const bgShiftY = e.clientY * 0.05;
+
+            document.body.style.backgroundPosition = `${bgShiftX}px ${bgShiftY}px`;
+        });
+
+        document.addEventListener('mouseleave', function () {
+            document.body.style.backgroundPosition = 'top left';
+        });
+    </script>
+</body>
+</html>

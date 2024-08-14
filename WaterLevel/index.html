@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Level</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Water Level Monitor</h1>
+        <canvas id="waterLevelChart"></canvas>
+        <div class="buttons">
+            <button onclick="plotToday()">Today</button>
+            <button onclick="plotLast7Days()">Past 7 Days</button>
+            <button onclick="plotMax()">Max</button>
+        </div>
+    </div>
+    <div class="spotlight" id="spotlight"></div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
